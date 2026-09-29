@@ -232,6 +232,7 @@ private let operationTraceCensusReadRoutes: Set<String> = [
 /// the ones the census context routes (measured), plus `transport.resume`, which only play's
 /// paused-transport path reaches.
 private let operationTraceCensusInternalWriteRoutes: Set<String> = [
+    "menu.click",
     "mmc.play", "mmc.record_strobe", "mmc.stop",
     "nav.delete_marker", "nav.open_marker_list", "nav.rename_marker", "nav.zoom_to_fit",
     "plugin.insert", "plugin.insert_verified", "plugin.set_eq_band_verified", "plugin.set_param_verified",
@@ -347,8 +348,8 @@ extension OperationTraceTests {
         let mutatingSpecs = OperationRegistry.specs.filter {
             $0.mutability == Mutability.`mutating`
         }
-        #expect(OperationRegistry.specs.count == 117)   // #291 registered mixer.set_output_verified
-        #expect(mutatingSpecs.count == 93)   // #291 mixer.set_output_verified
+        #expect(OperationRegistry.specs.count == 119)   // #291 mixer.set_output_verified; system.list_menus + system.click_menu
+        #expect(mutatingSpecs.count == 94)   // #291 mixer.set_output_verified; system.click_menu
 
         // A mutating op that refuses BEFORE dispatch starts its trace starts no trace with the
         // coverage params (which carry no consent), so it is asserted to claim NO trace coverage
@@ -474,10 +475,10 @@ extension OperationTraceTests {
 
         let readOnlySpecs = OperationRegistry.specs.filter { $0.mutability == .readOnly }
         let mutatingSpecs = OperationRegistry.specs.filter { $0.mutability == Mutability.`mutating` }
-        #expect(OperationRegistry.specs.count == 117)   // #291 registered mixer.set_output_verified
-        #expect(readOnlySpecs.count == 24)
-        // Mutability is total: the mutating census (93) and this inverse gate
-        // (24) together account for every registered spec, so a new operation
+        #expect(OperationRegistry.specs.count == 119)   // #291 mixer.set_output_verified; system.list_menus + system.click_menu
+        #expect(readOnlySpecs.count == 25)   // system.list_menus
+        // Mutability is total: the mutating census (94) and this inverse gate
+        // (25) together account for every registered spec, so a new operation
         // cannot land outside both gates.
         #expect(readOnlySpecs.count + mutatingSpecs.count == OperationRegistry.specs.count)
 
@@ -1070,6 +1071,11 @@ private func operationTraceCoverageParams(
         ]
     case .tracksMute, .tracksSolo, .tracksArm:
         return ["index": .int(0), "enabled": .bool(true)]
+    case .systemClickMenu:
+        return [
+            "path": .array([.string("Coverage Menu"), .string("Coverage Item")]),
+            "confirmed": .bool(true),
+        ]
     case .tracksRecordSequence:
         return ["notes": .string("60,0,100")]
     case .tracksSetAutomation:

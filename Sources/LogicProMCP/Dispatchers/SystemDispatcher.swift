@@ -276,7 +276,7 @@ struct SystemDispatcher: OperationTraceDispatching {
             Diagnostics, help, and saga coordination for the Logic Pro MCP server. \
             Commands: health, permissions, refresh_cache, export_support_bundle, saga_preflight, \
             saga_execute, saga_status, saga_cancel, list_recent_traces, get_trace, clear_traces, \
-            setup_arm_key, setup_control_surface, help. \
+            setup_arm_key, setup_control_surface, list_menus, click_menu, help. \
             Params by command: \
             help -> { category: String } (returns full param docs for a dispatcher); \
             refresh_cache -> {} (force AX re-poll); \
@@ -290,7 +290,15 @@ struct SystemDispatcher: OperationTraceDispatching {
             drive that assigns the coordinate-free record-arm chord; no mouse); \
             setup_control_surface -> { consent: "true" } (one-time consent-gated install of the \
             Mackie Control surface plus binding of both its MIDI ports to this server's port, \
-            which is what makes MCU operations take effect; no mouse). \
+            which is what makes MCU operations take effect; no mouse); \
+            list_menus -> { menu?: String, max_depth?: Int (1-5, default 3) } (reads Logic's whole \
+            menu bar without opening it: each item's live title, path, enabled, has_submenu and \
+            shortcut; titles_may_be_stale_until_opened is always true); \
+            click_menu -> { path: [String] or "Menu > Item", confirmed: true } (presses ONE menu item \
+            named by live titles as list_menus reports them; matching trims, ignores case and treats \
+            "..." as the ellipsis character; State B, the effect is not read back; refuses a missing \
+            or ambiguous title, a disabled item, an item with a submenu, the Apple menu, and any \
+            Command-Q item, for which use logic_project quit). \
             Saga work is ordered best-effort work with compensation; it does not promise \
             all-or-nothing completion or durable recovery. The journal is session-only and \
             cleared when the server session ends, including process restart. \
@@ -554,6 +562,12 @@ struct SystemDispatcher: OperationTraceDispatching {
                 "source": .string("none"),
                 "message": .string(message),
             ]))
+
+        case "list_menus":
+            return await Self.handleListMenus(params: params, router: router)
+
+        case "click_menu":
+            return await Self.handleClickMenu(params: params, router: router)
 
         case "setup_arm_key":
             // Consent-first: refuse before the trace, the mutation gate, or any
@@ -1719,6 +1733,70 @@ struct SystemDispatcher: OperationTraceDispatching {
         unhandledCommandResult(command, label: "system")
     }
 
+    // MARK: - Menu bar (list_menus / click_menu)
+
+    /// `list_menus` is a read: validate, route, and hand back what the Accessibility channel read.
+    /// It starts no trace and arms no write boundary, like every other read-only operation.
+    private static func handleListMenus(
+        params: [String: Value],
+        router: ChannelRouter
+    ) async -> CallTool.Result {
+        switch MenuBarModel.listChannelParams(params) {
+        case .invalid(let hint):
+            return toolInvalidParamsResult(
+                hint,
+                extras: ["operation": OperationID.systemListMenus.rawValue, "write_attempted": false]
+            )
+        case .params(let channelParams):
+            let routed = await router.route(operation: "menu.list", params: channelParams)
+            return toolTextResult(routed)
+        }
+    }
+
+    /// The refusal hint for a `click_menu` without `confirmed:true`. One spelling, shared with tests.
+    static let clickMenuConfirmationHint =
+        "click_menu requires 'confirmed:true' because it presses an arbitrary item of Logic's menu bar"
+
+    /// `click_menu` presses one menu item. The confirmation gate is the registry's
+    /// `ConfirmationPolicy` (l2), enforced here exactly as `clear_traces` enforces its own, and it
+    /// runs before the path is even parsed, the trace starts, or anything is routed.
+    private static func handleClickMenu(
+        params: [String: Value],
+        router: ChannelRouter
+    ) async -> CallTool.Result {
+        let refusalExtras: [String: Any] = [
+            "operation": OperationID.systemClickMenu.rawValue,
+            "write_attempted": false,
+        ]
+        let clickMenuConfirmation = OperationRegistry.spec(
+            tool: ToolID.logicSystem.rawValue,
+            command: "click_menu"
+        )?.confirmation ?? .l2
+        if DestructivePolicy.level(of: clickMenuConfirmation) >= .l2 {
+            switch strictBoolParam(params, "confirmed") {
+            case .value(true):
+                break
+            case .invalid(let hint):
+                return toolInvalidParamsResult("click_menu \(hint)", extras: refusalExtras)
+            case .missing, .value(false):
+                return toolInvalidParamsResult(Self.clickMenuConfirmationHint, extras: refusalExtras)
+            }
+        }
+        let channelParams: [String: String]
+        switch MenuBarModel.clickChannelParams(params) {
+        case .params(let built):
+            channelParams = built
+        case .invalid(let hint):
+            return toolInvalidParamsResult(hint, extras: refusalExtras)
+        }
+        let traceID = await startTraceIfEnabled(command: "click_menu")
+        let result = await withWriteBoundaryArmed(traceID) {
+            await router.route(operation: "menu.click", params: channelParams)
+        }
+        // State B on success: the press was sent and accepted; what the item did is not read back.
+        return await finalizeTrace(toolTextResult(result), traceID: traceID)
+    }
+
     private static func handleTraceCommand(
         command: String,
         params: [String: Value]
@@ -2101,6 +2179,8 @@ struct SystemDispatcher: OperationTraceDispatching {
                   saga_execute      -> { steps: [step], idempotency_key: String } — Execute ordered steps with evidence and compensation
                   saga_status       -> { idempotency_key: String } — Read the session journal
                   saga_cancel       -> { idempotency_key: String } — Request cancellation; State B until unwind is journaled, then terminal status carries its outcome
+                  list_menus        -> { menu?: String, max_depth?: Int } — Read Logic's menu bar: live titles, paths, enabled, submenus, shortcuts (max_depth 1-5, default 3)
+                  click_menu        -> { path: [String] | "Menu > Item", confirmed: Bool } — Press one menu item by its live titles; requires confirmed:true; State B (effect not read back)
                   help              -> { category: String } — Param docs per category
 
                 step = { operation_id: String, target_ref?: String, params: Object,

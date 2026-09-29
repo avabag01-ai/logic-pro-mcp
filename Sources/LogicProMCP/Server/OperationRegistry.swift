@@ -44,6 +44,8 @@ enum OperationID: String, CaseIterable, Codable, Sendable, Hashable {
     case systemSagaCancel = "system.saga_cancel"
     case systemSetupArmKey = "system.setup_arm_key"
     case systemSetupControlSurface = "system.setup_control_surface"
+    case systemListMenus = "system.list_menus"
+    case systemClickMenu = "system.click_menu"
     case pluginsGetInventory = "plugins.get_inventory"
     case pluginsSetParamVerified = "plugins.set_param_verified"
     case pluginsSetEQBandVerified = "plugins.set_eq_band_verified"
@@ -314,6 +316,7 @@ enum OperationRegistry {
             "system.export_support_bundle", "system.help", "system.saga_preflight",
             "system.saga_execute", "system.saga_status", "system.saga_cancel",
             "system.setup_arm_key", "system.setup_control_surface",
+            "system.list_menus", "system.click_menu",
         ],
         ToolID.logicPlugins.rawValue: [
             "plugins.get_inventory", "plugins.set_param_verified", "plugins.set_eq_band_verified", "plugins.insert_verified",
@@ -372,6 +375,7 @@ enum OperationRegistry {
             "list_recent_traces", "get_trace", "clear_traces",
             "saga_preflight", "saga_execute", "saga_status", "saga_cancel",
             "setup_arm_key", "setup_control_surface",
+            "list_menus", "click_menu",
         ],
         ToolID.logicPlugins.rawValue: [
             "get_inventory", "set_param_verified", "set_eq_band_verified", "insert_verified",
@@ -683,13 +687,20 @@ enum OperationRegistry {
         (.systemSetupArmKey, "setup_arm_key", Mutability.`mutating`, DeadlineClass.long, VerificationPolicy.readbackRequired, ["consent"]),
         // WHY: a consent-gated one-time control-surface install + port binding (#884); mutating with a long budget (drives the Setup window, the Install picker and two port popups, then waits for MCU feedback newer than the drive), consent is the only required param.
         (.systemSetupControlSurface, "setup_control_surface", Mutability.`mutating`, DeadlineClass.long, VerificationPolicy.readbackRequired, ["consent"]),
+        // WHY: a read of Logic's whole AX menu bar (every item's live title, enabled state, submenu
+        // flag and shortcut). Medium budget because a full walk at max_depth 5 is thousands of AX reads.
+        (.systemListMenus, "list_menus", Mutability.readOnly, DeadlineClass.medium, VerificationPolicy.none, ["max_depth", "menu"]),
+        // WHY: presses ONE menu item named by the caller's path of live AX titles. What the item does
+        // is not read back (it can be anything Logic's menus offer), so it is State B and
+        // `VerificationPolicy.none`; `.l2` confirmation (below) because the target is arbitrary.
+        (.systemClickMenu, "click_menu", Mutability.`mutating`, DeadlineClass.short, VerificationPolicy.none, ["confirmed", "path"]),
     ] as [(OperationID, String, Mutability, DeadlineClass, VerificationPolicy, Set<String>)]).map { entry in
         OperationSpec(
             id: entry.0,
             tool: .logicSystem,
             command: entry.1,
             mutability: entry.2,
-            confirmation: entry.0 == .systemClearTraces ? .l2 : .none,
+            confirmation: systemConfirmation(for: entry.0),
             target: .none,
             verification: entry.4,
             retry: .neverAutomatic,
@@ -996,6 +1007,19 @@ enum OperationRegistry {
 
     static func traceAvailability(traceEnabled: Bool) -> AvailabilityPolicy {
         traceEnabled ? .defaultInstall : .experimental
+    }
+
+    /// The `logic_system` operations that require an explicit `confirmed:true`: `clear_traces`
+    /// destroys in-process diagnostic evidence, and `click_menu` presses an arbitrary item of
+    /// Logic's menu bar. Typed helper (not inline) for the same type-checker reason as
+    /// `projectDirtySections` below.
+    private static func systemConfirmation(for operationID: OperationID) -> ConfirmationPolicy {
+        switch operationID {
+        case .systemClearTraces, .systemClickMenu:
+            return .l2
+        default:
+            return .none
+        }
     }
 
     /// Lifecycle transitions swap the whole open-project world; the project

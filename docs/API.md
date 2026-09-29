@@ -256,9 +256,15 @@ Destructive or file-writing paths require confirmation. `save_as` verifies the r
 
 ### `logic_system`
 
-Common commands: `health`, `permissions`, `refresh_cache`, `export_support_bundle`, `setup_arm_key`, `list_recent_traces`, `get_trace`, `clear_traces`, `saga_preflight`, `saga_execute`, `saga_status`, `saga_cancel`, `help`.
+Common commands: `health`, `permissions`, `refresh_cache`, `export_support_bundle`, `setup_arm_key`, `setup_control_surface`, `list_menus`, `click_menu`, `list_recent_traces`, `get_trace`, `clear_traces`, `saga_preflight`, `saga_execute`, `saga_status`, `saga_cancel`, `help`.
 
 Use `health` for channel readiness and `help` for command summaries. `help` accepts category `all`, `transport`, `tracks`, `mixer`, `midi`, `edit`, `navigate`, `project`, `audio`, `plugins`, or `system`.
+
+#### `list_menus` and `click_menu`
+
+`list_menus` reads Logic's whole menu bar through the Accessibility API, without opening any menu, and returns the tree: every top-level menu (with its `menu_bar_index` and whether `click_menu` accepts it) and, recursively, every item's exact AX `title`, `path` (titles from the menu bar down), `enabled` (`true`, `false`, or `null` when `AXEnabled` could not be read), `has_submenu`, and `shortcut` (`key`, `modifiers`, `raw_modifiers`, `display`, decoded from `AXMenuItemCmdChar` / `AXMenuItemCmdModifiers`) when the item has one. Separators are skipped. Optional params: `menu` (one top-level menu, matched the same way `click_menu` matches) and `max_depth` (item levels below the menu bar, 1-5, default 3; a submenu below the limit is marked `items_truncated_at_max_depth`). The response carries `ui_locale` from the product's locale detector and always `titles_may_be_stale_until_opened: true`: Logic rewrites some titles only when their menu opens (the Edit menu's Undo row is the measured case), and this read does not open menus. A tree that read completely is State A; one with unreadable parts is State B `readback_unavailable` with `complete: false` and an `unreadable` list.
+
+`click_menu` presses one menu item. `path` is the list of titles from the menu bar down, as an array (`["Track", "New Tracks..."]`) or one string separated by `" > "`; at most six titles. `confirmed: true` is required (L2, like `clear_traces`). Titles are matched against the LIVE AX titles only, never against a built-in label, so it works in whatever language Logic runs: matching trims whitespace, reads U+00A0 as a space and `…` as `...`, and ignores case. It refuses (State C, nothing pressed) when a title matches no sibling (the error lists `available_titles`), when it matches more than one, when the last item has a submenu, when its `AXEnabled` is `false` or unreadable, when the path starts at the Apple menu (menu-bar item 0), and when the item's shortcut is Command-Q — use `logic_project quit` for that. A successful press is State B `readback_unavailable` with `path_matched` (the actual AX titles) and `ui_locale`: the press was accepted, and what the item did is not read back.
 
 #### `setup_arm_key` (v3.12.0)
 

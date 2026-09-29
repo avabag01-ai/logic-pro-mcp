@@ -290,6 +290,13 @@ extension ChannelRouter {
         "plugin.set_param":           [.scripter],  // deterministic plugin parameter path
         "plugin.scan_presets":        [.accessibility],  // F2 — AX-only ladder (AXShowMenu→AXPress); ADR-001 removed the CGEvent popup last-resort
 
+        // Menu bar (logic_system list_menus / click_menu). Accessibility alone: the read walks the
+        // live AX menu bar, and the press is an AXPress on the one item the caller's path of live
+        // titles resolved to. No keystroke or MIDI rung can name an arbitrary menu item, so a
+        // fallback would be a different action, not the same one by another route.
+        "menu.list":                  [.accessibility],
+        "menu.click":                 [.accessibility],
+
         // Automation
         "automation.set_mode":        [.mcu, .midiKeyCommands, .cgEvent],
         "automation.toggle_view":     [.midiKeyCommands, .cgEvent],

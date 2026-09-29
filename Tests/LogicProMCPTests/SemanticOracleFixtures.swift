@@ -204,6 +204,21 @@ enum SemanticOracleFixtures {
                 """,
             readback: health
         ),
+        // AccessibilityChannel+MenuBar `defaultListMenus` State A, one menu read to depth 3.
+        .systemListMenus: SemanticOracleFixture(
+            response: """
+                {"success":true,"verified":true,"state":"A","operation":"system.list_menus",\
+                "source":"ax_menu_bar","max_depth":3,"entry_count":2,"complete":true,\
+                "truncated_at_max_depth":false,"titles_may_be_stale_until_opened":true,\
+                "ui_locale":"en-US","menus":[{"title":"Track","path":["Track"],"enabled":true,\
+                "has_submenu":true,"menu_bar_index":4,"clickable":true,\
+                "items":[{"title":"New Tracks\u{2026}","path":["Track","New Tracks\u{2026}"],\
+                "enabled":true,"has_submenu":false,"shortcut":{"key":"N",\
+                "modifiers":["option","command"],"raw_modifiers":2,\
+                "display":"\u{2325}\u{2318}N"}}]}]}
+                """,
+            readback: health
+        ),
         .pluginsGetInventory: SemanticOracleFixture(
             response: """
                 {"success":true,"verified":true,"state":"A","hc_schema":2,\
