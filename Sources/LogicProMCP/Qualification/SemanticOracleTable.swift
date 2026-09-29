@@ -324,6 +324,17 @@ enum SemanticOracleTable {
             "live State-A contract pending — State A is a fresh, changed MCU LCD upper row; "
             + "live records from ten Logic languages exist, but no oracle pinning "
             + "verify_source mcu_lcd_upper_row has been written yet",
+        .systemClickMenu:
+            // Post-closure like the entries above, and NOT back-dated into a phase set. The exclusion
+            // is about the TARGET: click_menu presses whichever item the caller's path names, so what
+            // it changes is anything Logic's menus can do -- a window opening, a track created, a
+            // preference toggled -- and there is no one resource an independent readback could read
+            // for an arbitrary item. The handler therefore answers State B (`readback_unavailable`,
+            // `effect_read_back: false`) on success and never State A, and a State-A fixture here
+            // would pin a contract the handler cannot produce.
+            "unverifiable by construction for an arbitrary target — the pressed menu item can do "
+            + "anything Logic's menus offer, so no single logic:// resource can read the effect back; "
+            + "the handler emits State B readback_unavailable after an accepted AXPress, never State A",
         .mixerSetOutputVerified:
             // #291 R2. Post-closure like mixer.bank, and for the same reason NOT back-dated into a
             // phase set. Its State A is the same strip's output slot read back by R1's reader
@@ -522,6 +533,7 @@ enum SemanticOracleTable {
         systemClearTraces,
         systemSagaPreflight,
         systemSagaStatus,
+        systemListMenus,
         pluginsGetInventory,
         projectIsRunning,
         projectGetRegions,
@@ -827,6 +839,27 @@ enum SemanticOracleTable {
                 key: "record.status",
                 allowed: ["in_progress", "cancellation_requested", "cancelled", "completed"]
             ),
+        ]
+    )
+
+    // SystemDispatcher `case "list_menus"` → AccessibilityChannel+MenuBar `defaultListMenus`
+    // State A: {operation, source, menus:[{title, path, enabled, has_submenu, menu_bar_index,
+    // clickable, items?, shortcut?}], max_depth, entry_count, truncated_at_max_depth, complete,
+    // ui_locale, titles_may_be_stale_until_opened}. A menu bar that did not read completely is State
+    // B and fails this oracle on `state`, which is the point: a partial tree is not a verified read.
+    // The probe sends no params, so `max_depth` is the default; the range admits any legal depth.
+    static let systemListMenus = OperationOracle(
+        .systemListMenus,
+        strength: .shapeAndDomain,
+        constraints: [
+            .valueEquals(key: "state", expected: .string("A")),
+            .valueEquals(key: "operation", expected: .string(OperationID.systemListMenus.rawValue)),
+            .valueEquals(key: "complete", expected: .bool(true)),
+            .valueEquals(key: "titles_may_be_stale_until_opened", expected: .bool(true)),
+            .nonEmptyArray(key: "menus"),
+            .typedField(key: "menus.0.title", type: .string),
+            .typedField(key: "menus.0.path", type: .array),
+            .numericRange(key: "max_depth", min: 1, max: 5),
         ]
     )
 

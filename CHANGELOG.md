@@ -9,6 +9,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ## [Unreleased]
 
 ### Added
+- **`logic_system list_menus` and `click_menu`: Logic's whole menu bar, read and pressed through the
+  Accessibility API.** `list_menus { menu?, max_depth? }` returns every menu item's exact AX title,
+  path, enabled state (`null` when unreadable), submenu flag and decoded shortcut, with `ui_locale`
+  and `titles_may_be_stale_until_opened: true` (it does not open menus). `click_menu { path,
+  confirmed: true }` presses the one item a path of live titles resolves to (array, or one string
+  separated by `" > "`; matching trims, ignores case, reads U+00A0 as a space and `…` as `...`). It
+  is L2-confirmed and refuses a missing or ambiguous title (listing the sibling titles), a disabled
+  or unreadable item, an item with a submenu, the Apple menu and any Command-Q item. A press is
+  State B: accepted, effect not read back. No localized label is compiled in; both commands work in
+  whatever language Logic runs. Registry censuses grow to 119 operations (94 mutating, 25
+  read-only).
 - **`logic_mixer set_output_verified`: one strip's output to one exact destination, read back
   from the same strip (#291 R2).** `destination` is `{kind:"bus", number}`, `{kind:"physical",
   ports:[a,b]}` or `{kind:"stereo_output"}`; the strip is `track` or `target_ref`;

@@ -722,6 +722,12 @@ actor AccessibilityChannel: Channel {
         case "plugin.insert_verified":
             return await AccessibilityChannel.defaultInsertVerified(params: params, runtime: runtime.logicRuntime)
 
+        // MARK: - Menu bar (logic_system list_menus / click_menu)
+        case "menu.list":
+            return AccessibilityChannel.defaultListMenus(params: params, runtime: runtime.logicRuntime)
+        case "menu.click":
+            return AccessibilityChannel.defaultClickMenu(params: params, runtime: runtime.logicRuntime)
+
         // MARK: - Automation
         // #592: `automation.set_mode` routes `[.mcu, .midiKeyCommands, .cgEvent]` — accessibility is
         // not in its chain and the key-command channel carries it, so this arm was unreachable too.

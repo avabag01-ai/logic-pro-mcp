@@ -24,7 +24,7 @@ struct OperationRegistryCoverageTests {
         let missing = Self.publicOperations.subtracting(Self.registeredOperations).sorted()
         let orphans = Self.registeredOperations.subtracting(Self.publicOperations).sorted()
 
-        #expect(OperationRegistry.specs.count == 117)   // #884 system.setup_control_surface, #862 mixer.bank, #965 project.inspect_session, #291 mixer.set_output_verified
+        #expect(OperationRegistry.specs.count == 119)   // #884 system.setup_control_surface, #862 mixer.bank, #965 project.inspect_session, #291 mixer.set_output_verified, system.list_menus + system.click_menu
         #expect(OperationRegistry.registeredToolRawValues == Set(WorkflowSkillCatalog.publicCommands.keys))
         #expect(Self.registeredOperations.count == OperationRegistry.specs.count)
         #expect(missing.isEmpty, "missing specs: \(missing)")
@@ -87,7 +87,7 @@ struct OperationRegistryCoverageTests {
             .tracksSetInstrument,
         ]
 
-        #expect(mutating.count == 93)   // #448: sort_verified is a mutating structural verb;
+        #expect(mutating.count == 94)   // #448: sort_verified is a mutating structural verb;
                                         // #301 added plugins.set_eq_band_verified, which is
                                         // target-bearing, so `targetless` is unchanged;
                                         // #884 added system.setup_control_surface, which bears no
@@ -95,10 +95,12 @@ struct OperationRegistryCoverageTests {
                                         // #862 added mixer.bank, which moves the MCU strip
                                         // window and so bears no track target either;
                                         // #291 R2 added mixer.set_output_verified, which is
-                                        // target-bearing, so `targetless` is unchanged
-        #expect(readOnly.count == 24)   // #965 added project.inspect_session
+                                        // target-bearing, so `targetless` is unchanged;
+                                        // system.click_menu presses a menu item, not a track,
+                                        // so it bears no target
+        #expect(readOnly.count == 25)   // #965 added project.inspect_session, then system.list_menus
         #expect(targetBearingIDs == expectedTargetBearingIDs)
-        #expect(targetless.count == 77)   // #448 sort_verified, #884 setup_control_surface and #862 bank bear no target
+        #expect(targetless.count == 78)   // #448 sort_verified, #884 setup_control_surface, #862 bank and system.click_menu bear no target
         #expect(targetBearingIDs.count + targetless.count == mutating.count)
         #expect(readOnly.allSatisfy { $0.target == .none })
     }

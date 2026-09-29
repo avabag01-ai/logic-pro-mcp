@@ -52,7 +52,7 @@ struct OperationRegistryTests {
         "delete_marker": .defaultInstall,
     ]
 
-    private static let smallToolCount = 21
+    private static let smallToolCount = 23
     private static let expectedRegistryCount =
         commands.count + mixerCommands.count + navigateCommands.count + smallToolCount
             + editCommands.count + projectCommands.count + midiCommands.count + trackCommands.count
@@ -368,6 +368,8 @@ struct OperationRegistryTests {
         ("logic_system", "system.saga_cancel", "saga_cancel", .mutating, .short, .readbackRequired),
         ("logic_system", "system.setup_arm_key", "setup_arm_key", .mutating, .long, .readbackRequired),
         ("logic_system", "system.setup_control_surface", "setup_control_surface", .mutating, .long, .readbackRequired),
+        ("logic_system", "system.list_menus", "list_menus", .readOnly, .medium, .none),
+        ("logic_system", "system.click_menu", "click_menu", .mutating, .short, .none),
         ("logic_plugins", "plugins.get_inventory", "get_inventory", .readOnly, .short, .none),
         ("logic_plugins", "plugins.set_param_verified", "set_param_verified", .mutating, .medium, .readbackRequired),
         ("logic_plugins", "plugins.set_eq_band_verified", "set_eq_band_verified", .mutating, .medium, .readbackRequired),
@@ -408,7 +410,7 @@ struct OperationRegistryTests {
             #expect(spec.tool == tool)
             #expect(spec.command == entry.command)
             #expect(spec.mutability == entry.mutability)
-            #expect(spec.confirmation == (id == .systemClearTraces ? .l2 : .none))
+            #expect(spec.confirmation == (id == .systemClearTraces || id == .systemClickMenu ? .l2 : .none))
             #expect(spec.target == (
                 id == .pluginsSetParamVerified || id == .pluginsSetEQBandVerified || id == .pluginsInsertVerified
                     ? .acceptsStableTarget
@@ -611,6 +613,7 @@ struct OperationRegistryTests {
         ("logic_project", "export_resume", .l2),
         ("logic_mixer", "insert_plugin", .l2),
         ("logic_system", "clear_traces", .l2),
+        ("logic_system", "click_menu", .l2),
         ("logic_tracks", "sort_verified", .l2),
         ("logic_project", "close", .l3),
         ("logic_project", "quit", .l3),
